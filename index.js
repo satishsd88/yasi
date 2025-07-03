@@ -3,14 +3,26 @@ const multer = require('multer');
 const { OpenAI } = require('openai');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
+const { Readable } = require('stream');
 
 const app = express();
-const upload = multer();
-const openai = new OpenAI(process.env.OPENAI_API_KEY);
+const upload = multer({ storage: multer.memoryStorage() });
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 // Middleware
 app.use(cors());
 app.use(express.static('public'));
+
+// Helper function to convert buffer to stream
+const bufferToStream = (buffer) => {
+  const stream = new Readable();
+  stream.push(buffer);
+  stream.push(null);
+  return stream;
+};
 
 // API endpoint for processing audio
 app.post('/api/process-audio', upload.single('audio'), async (req, res) => {
@@ -19,9 +31,17 @@ app.post('/api/process-audio', upload.single('audio'), async (req, res) => {
       return res.status(400).json({ error: 'No audio file provided' });
     }
 
+    // Create a file-like object for OpenAI API
+    const file = {
+      buffer: req.file.buffer,
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      stream: bufferToStream(req.file.buffer)
+    };
+
     // Transcribe audio with Whisper
     const transcription = await openai.audio.transcriptions.create({
-      file: req.file,
+      file: file,
       model: "whisper-1"
     });
 
@@ -38,8 +58,11 @@ app.post('/api/process-audio', upload.single('audio'), async (req, res) => {
       answer: completion.choices[0].message.content
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error processing audio' });
+    console.error("Detailed error:", error);
+    res.status(500).json({ 
+      error: 'Error processing audio',
+      details: error.message
+    });
   }
 });
 
