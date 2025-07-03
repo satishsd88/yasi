@@ -1,22 +1,66 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Interview Results</title>
+  <title>Interview Assistant Results</title>
   <style>
-    body { font-family: Arial; padding: 20px; max-width: 800px; margin: 0 auto; }
-    .question { font-weight: bold; margin-bottom: 10px; }
-    .answer { background: #fffae6; padding: 15px; border-radius: 5px; }
+    body { 
+      font-family: Arial, sans-serif; 
+      padding: 20px; 
+      max-width: 800px; 
+      margin: 0 auto;
+      background-color: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .question { 
+      font-size: 18px;
+      font-weight: bold; 
+      margin-bottom: 15px;
+      color: #333;
+    }
+    .answer { 
+      background: #fffae6; 
+      padding: 15px; 
+      border-radius: 5px;
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+    h1 {
+      color: #2c3e50;
+      margin-bottom: 20px;
+    }
   </style>
 </head>
 <body>
-  <h1>Interview Assistant Results</h1>
-  <div class="question" id="question"></div>
-  <div class="answer" id="answer"></div>
+  <div class="container">
+    <h1>Interview Assistant Results</h1>
+    <div class="question" id="question">No question available</div>
+    <div class="answer" id="answer">No answer available</div>
+  </div>
 
   <script>
-    const params = new URLSearchParams(window.location.search);
-    document.getElementById('question').textContent = params.get('question');
-    document.getElementById('answer').textContent = params.get('answer');
+    document.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const question = params.get('question') || 'No question available';
+      const answer = params.get('answer') || 'No answer available';
+      
+      document.getElementById('question').textContent = question;
+      document.getElementById('answer').textContent = answer;
+      
+      // Fallback to sessionStorage if no params (useful for debugging)
+      if (question === 'No question available') {
+        const savedData = sessionStorage.getItem('interviewResults');
+        if (savedData) {
+          const data = JSON.parse(savedData);
+          document.getElementById('question').textContent = data.question;
+          document.getElementById('answer').textContent = data.answer;
+        }
+      }
+    });
   </script>
 </body>
 </html>
