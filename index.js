@@ -18,14 +18,22 @@ app.use(express.static('public'));
 
 // Proper file handling for OpenAI API
 const createOpenAIFile = (buffer, filename) => {
-  const stream = Readable.from(buffer);
+  // Create a temporary file
+  const tempFilePath = path.join(__dirname, 'temp', filename);
+  fs.writeFileSync(tempFilePath, buffer);
+  
+  // Return a proper File object
   return {
-    buffer,
-    stream,
+    file: fs.createReadStream(tempFilePath),
     name: filename,
-    type: 'audio/webm' // or the appropriate mime type
+    type: 'audio/webm'
   };
 };
+
+// Ensure temp directory exists
+if (!fs.existsSync(path.join(__dirname, 'temp'))) {
+  fs.mkdirSync(path.join(__dirname, 'temp'));
+}
 
 // API endpoint for processing audio
 app.post('/api/process-audio', upload.single('audio'), async (req, res) => {
@@ -39,9 +47,13 @@ app.post('/api/process-audio', upload.single('audio'), async (req, res) => {
 
     // Transcribe audio with Whisper
     const transcription = await openai.audio.transcriptions.create({
-      file: audioFile,
-      model: "whisper-1"
+      file: audioFile.file,  // Use the file stream directly
+      model: "whisper-1",
+      response_format: "json"
     });
+
+    // Clean up temporary file
+    fs.unlinkSync(path.join(__dirname, 'temp', 'recording.webm'));
 
     // Get GPT response
     const completion = await openai.chat.completions.create({
@@ -58,6 +70,11 @@ app.post('/api/process-audio', upload.single('audio'), async (req, res) => {
       redirectUrl: `/results?question=${encodeURIComponent(transcription.text)}&answer=${encodeURIComponent(completion.choices[0].message.content)}`
     });
   } catch (error) {
+    // Clean up temporary file if it exists
+    if (fs.existsSync(path.join(__dirname, 'temp', 'recording.webm'))) {
+      fs.unlinkSync(path.join(__dirname, 'temp', 'recording.webm'));
+    }
+    
     console.error("Detailed error:", error);
     res.status(500).json({ 
       success: false,
