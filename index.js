@@ -16,12 +16,15 @@ const openai = new OpenAI({
 app.use(cors());
 app.use(express.static('public'));
 
-// Helper function to convert buffer to stream
-const bufferToStream = (buffer) => {
-  const stream = new Readable();
-  stream.push(buffer);
-  stream.push(null);
-  return stream;
+// Proper file handling for OpenAI API
+const createOpenAIFile = (buffer, filename) => {
+  const stream = Readable.from(buffer);
+  return {
+    buffer,
+    stream,
+    name: filename,
+    type: 'audio/webm' // or the appropriate mime type
+  };
 };
 
 // API endpoint for processing audio
@@ -31,17 +34,12 @@ app.post('/api/process-audio', upload.single('audio'), async (req, res) => {
       return res.status(400).json({ error: 'No audio file provided' });
     }
 
-    // Create a file-like object for OpenAI API
-    const file = {
-      buffer: req.file.buffer,
-      originalname: req.file.originalname,
-      mimetype: req.file.mimetype,
-      stream: bufferToStream(req.file.buffer)
-    };
+    // Create properly formatted file for OpenAI
+    const audioFile = createOpenAIFile(req.file.buffer, 'recording.webm');
 
     // Transcribe audio with Whisper
     const transcription = await openai.audio.transcriptions.create({
-      file: file,
+      file: audioFile,
       model: "whisper-1"
     });
 
@@ -54,12 +52,15 @@ app.post('/api/process-audio', upload.single('audio'), async (req, res) => {
     });
 
     res.json({
+      success: true,
       transcript: transcription.text,
-      answer: completion.choices[0].message.content
+      answer: completion.choices[0].message.content,
+      redirectUrl: `/results?question=${encodeURIComponent(transcription.text)}&answer=${encodeURIComponent(completion.choices[0].message.content)}`
     });
   } catch (error) {
     console.error("Detailed error:", error);
     res.status(500).json({ 
+      success: false,
       error: 'Error processing audio',
       details: error.message
     });
